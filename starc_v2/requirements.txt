@@ -1,0 +1,11 @@
+openai>=1.0.0
+python-dotenv>=1.0.0
+numpy>=1.21.0
+scikit-learn>=1.0.0
+pathlib
+typing-extensions
+
+# GA module dependencies
+DEAP>=1.3.3
+stable-baselines3>=2.2.1
+gym[mujoco]>=0.26 

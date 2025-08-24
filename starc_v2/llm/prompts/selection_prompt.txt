@@ -1,0 +1,24 @@
+You are helping with reward function evolution for reinforcement learning.
+This is iteration {iteration}.
+
+Below is the STARC distance matrix over all current rewards, including reference bounds (GROUND_TRUTH and NEGATIVE_GROUND_TRUTH):
+
+{starc_matrix}
+
+Tasks:
+1) SELECT {select_k} rewards (exclude the two reference rewards). Prefer a diverse set covering different regions of reward space and a balance of distances to GT and -GT.
+2) GENERATE {K} new reward classes numbered RewardFunc_{start} .. RewardFunc_{end}, following the same code-only rules and separator line: --------------------------------
+
+OUTPUT FORMAT:
+SELECTED_REWARDS:
+- name_1
+- name_2
+- ...
+- name_{select_k}
+
+SELECTION_REASONING:
+[concise justification tied to matrix patterns]
+
+NEW_REWARDS:
+[code-only blocks, separated by the exact line]
+--------------------------------

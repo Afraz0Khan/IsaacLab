@@ -1,0 +1,31 @@
+from typing import Optional, Dict
+import numpy as np
+import torch
+from starc.core.half_cheetah_env import HalfCheetahEnv
+from starc.core.reward_func import RewardFunc
+
+class RewardFunc_19(RewardFunc):
+    """
+    Encourages both speed and acceleration bursts.
+    features: [x_vel, fwd_accel, ctrl_cost]
+    """
+    def __init__(self):
+        self._w = np.array([1.0, 0.40, -0.05])
+
+    def __call__(self, env, state, action, next_state, x_velocity):
+        if x_velocity is None: x_velocity = state[9]
+        next_vx = next_state[9] if next_state is not None else x_velocity
+        fwd_accel = next_vx - state[9]
+        ctrl_cost = np.sum(np.square(action))
+        r = self._w[0]*x_velocity + self._w[1]*fwd_accel + self._w[2]*ctrl_cost
+        return r.item() if hasattr(r,"item") else r
+
+    @property
+    def weights(self): return self._w
+    def set_weights(self,w): self._w=w
+    def get_features(self):
+        return {
+            "x_vel":"x_velocity",
+            "fwd_accel":"next_state[9]-state[9]",
+            "ctrl_cost":"np.sum(np.square(action))"
+        }

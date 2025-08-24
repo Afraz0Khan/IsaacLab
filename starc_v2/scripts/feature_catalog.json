@@ -1,0 +1,182 @@
+{
+  "x_velocity": {
+    "expression": "x_velocity",
+    "used_by": [
+      "RewardFunc_1",
+      "RewardFunc_16",
+      "RewardFunc_4",
+      "RewardFunc_3",
+      "RewardFunc_6"
+    ]
+  },
+  "ctrl_cost": {
+    "expression": "np.sum(np.square(action))",
+    "used_by": [
+      "RewardFunc_1",
+      "RewardFunc_20",
+      "RewardFunc_36",
+      "RewardFunc_18",
+      "RewardFunc_24",
+      "RewardFunc_35",
+      "RewardFunc_16",
+      "RewardFunc_4",
+      "RewardFunc_3",
+      "RewardFunc_6",
+      "RewardFunc_17",
+      "RewardFunc_25",
+      "RewardFunc_40",
+      "RewardFunc_33",
+      "RewardFunc_42",
+      "RewardFunc_43",
+      "RewardFunc_37",
+      "RewardFunc_46"
+    ]
+  },
+  "tanh_v": {
+    "expression": "np.tanh(x_velocity)",
+    "used_by": [
+      "RewardFunc_20"
+    ]
+  },
+  "x_vel_sq": {
+    "expression": "x_velocity**2",
+    "used_by": [
+      "RewardFunc_20"
+    ]
+  },
+  "sqrt_speed": {
+    "expression": "np.sign(x_velocity)*np.sqrt(np.abs(x_velocity))",
+    "used_by": [
+      "RewardFunc_48"
+    ]
+  },
+  "ctrl_cost_sq": {
+    "expression": "(np.sum(np.square(action)))**2",
+    "used_by": [
+      "RewardFunc_48"
+    ]
+  },
+  "x_vel": {
+    "expression": "x_velocity",
+    "used_by": [
+      "RewardFunc_36",
+      "RewardFunc_24",
+      "RewardFunc_17",
+      "RewardFunc_25",
+      "RewardFunc_40",
+      "RewardFunc_42",
+      "RewardFunc_46"
+    ]
+  },
+  "abs_pitch": {
+    "expression": "np.abs(state[2])",
+    "used_by": [
+      "RewardFunc_36",
+      "RewardFunc_16"
+    ]
+  },
+  "speed_pow": {
+    "expression": "np.sign(x_velocity)*np.abs(x_velocity)**1.5",
+    "used_by": [
+      "RewardFunc_18"
+    ]
+  },
+  "forward_lean": {
+    "expression": "-state[2]",
+    "used_by": [
+      "RewardFunc_24"
+    ]
+  },
+  "speed_torso": {
+    "expression": "x_velocity * env.get_body_com('torso')[2]",
+    "used_by": [
+      "RewardFunc_35"
+    ]
+  },
+  "torso_z": {
+    "expression": "env.get_body_com('torso')[2]",
+    "used_by": [
+      "RewardFunc_16"
+    ]
+  },
+  "joint_vel_sq": {
+    "expression": "np.sum(np.square(state[11:]))",
+    "used_by": [
+      "RewardFunc_16",
+      "RewardFunc_3"
+    ]
+  },
+  "ang_vel_sq": {
+    "expression": "np.sum(np.square(state[11:]))",
+    "used_by": [
+      "RewardFunc_4"
+    ]
+  },
+  "eff_penalty": {
+    "expression": "ctrl_cost/(np.abs(x_velocity)+1e-6)",
+    "used_by": [
+      "RewardFunc_6"
+    ]
+  },
+  "efficiency": {
+    "expression": "x_velocity/(ctrl_cost+1e-6)",
+    "used_by": [
+      "RewardFunc_17",
+      "RewardFunc_37"
+    ]
+  },
+  "log_speed": {
+    "expression": "np.log1p(np.abs(x_velocity))*np.sign(x_velocity)",
+    "used_by": [
+      "RewardFunc_34"
+    ]
+  },
+  "l1_torque": {
+    "expression": "np.sum(np.abs(action))",
+    "used_by": [
+      "RewardFunc_34"
+    ]
+  },
+  "abs_front_foot_angle": {
+    "expression": "np.abs(state[8])",
+    "used_by": [
+      "RewardFunc_34"
+    ]
+  },
+  "abs_torso_z_vel": {
+    "expression": "np.abs(state[10])",
+    "used_by": [
+      "RewardFunc_25"
+    ]
+  },
+  "torso_z_vel": {
+    "expression": "np.abs(state[10])",
+    "used_by": [
+      "RewardFunc_40"
+    ]
+  },
+  "exp_speed": {
+    "expression": "np.exp(0.3 * x_velocity)",
+    "used_by": [
+      "RewardFunc_33"
+    ]
+  },
+  "accel_sq": {
+    "expression": "(next_state[9]-state[9])**2",
+    "used_by": [
+      "RewardFunc_42"
+    ]
+  },
+  "speed_mod": {
+    "expression": "x_velocity/(1.0+np.abs(state[8]))",
+    "used_by": [
+      "RewardFunc_43"
+    ]
+  },
+  "jerk_sq": {
+    "expression": "np.sum(np.square(next_state[11:]-state[11:]))",
+    "used_by": [
+      "RewardFunc_46"
+    ]
+  }
+}

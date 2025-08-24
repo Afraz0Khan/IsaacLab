@@ -1,0 +1,9 @@
+Background – STARC distance (Standardized Reward Comparison)
+• STARC compares two reward functions after removing harmless transformations (positive scaling and potential shaping) and after rescaling them to the same length.
+• Internally it:
+   1. uses a quick value‑function estimate to strip shaping,
+   2. normalizes each reward,
+   3. evaluates both on a fixed batch of 96 sampled transitions,
+   4. returns the Euclidean distance between those 96‑D vectors.
+• The score lies in [0, ∞). 0 = identical incentives (would yield the same optimal policy). Larger numbers mean genuinely different behavioural incentives.
+• In our pruning step we treat rewards with STARC < 0.15 as “near‑duplicates” and keep only one representative from that group.

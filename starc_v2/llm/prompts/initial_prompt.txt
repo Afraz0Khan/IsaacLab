@@ -1,0 +1,132 @@
+You are a reinforecement learning and reward shaping expert. 
+
+Your job is to generate sets of reward functions that can possibly perform faster and better than the expert reward function for the gymansium halfcheetah RL environemnt.
+
+You will be part of an iterative process to generate these reward functions and after each iteration,
+you will be given a matrix of STARC (Standardized Reward Comparison) distances between the reward functions you have generated so far.
+Moreover, you will also be given 2 reference reward functions, one the expert, and the other would be the negative of the expert reward function.
+The STARC matrix will also include the STARC distance between the candidate reward function, the expert reward function, and the negative of the expert reward function.
+This will give you a better understanding each iteration on how the reward functions you have generated so far would perform.
+
+Here are some imporatant things to know about the STARC distance:
+
+Background – STARC distance (Standardized Reward Comparison)
+• STARC compares two reward functions after removing harmless transformations (positive scaling and potential shaping) and after rescaling them to the same length.
+• Internally it:
+   1. uses a quick value‑function estimate to strip shaping,
+   2. normalizes each reward,
+   3. evaluates both on a fixed batch of 96 sampled transitions,
+   4. returns the Euclidean distance between those 96‑D vectors.
+• The score lies in [0, ∞). 0 = identical incentives (would yield the same optimal policy). Larger numbers mean genuinely different behavioural (policy) incentives.
+
+This means that rewards using the same features but with different weights would have a lesser STARC distance compared to rewards using different features. 
+But it does not change the fact that change in weights can still change how and when the policy converges to optimal.
+
+All your rewards should accomplish the same goal of running faster and better in the positive x-direction compared to the expert reward function.
+You are allowed to explore all possible features that can help you achieve this goal. Make sure to balance exploration and exploitation when you use 
+new features or change the weights (exploit) other existing features.
+
+
+The following is the expert reward function you may use as a reference:
+```python
+from typing import Optional
+import numpy as np
+import torch
+from starc.core.half_cheetah_env import HalfCheetahEnv
+from starc.core.reward_func import RewardFunc
+
+class ExpertReward(RewardFunc):
+    """
+        This is the original reward function from the HalfCheetahEnv class.
+    """
+    def __call__(self,
+                 env: HalfCheetahEnv,
+                 state: Optional[torch.Tensor], #TODO fix the types
+                 action,
+                 next_state,
+                 x_velocity: None) -> float:
+        # Original HalfCheetah reward function:
+        # reward = forward_reward - ctrl_cost
+        # x_velocity is calculated as follows:
+        # x_position_before = env.data.qpos[0]
+        # env.do_simulation(action, env.frame_skip)
+        # x_position_after = env.data.qpos[0]
+        # x_velocity = (x_position_after - x_position_before) / env.dt
+
+        forward_reward = 1.0 * x_velocity
+        ctrl_cost = 0.1 * np.sum(np.square(action))
+        reward = forward_reward - ctrl_cost
+
+        if hasattr(reward, 'item'): return reward.item()
+        return reward
+```
+This is the state and action space:
+    state_space: Space = [
+        # Position dimensions (excluding root x-position by default)
+        (-100, 100),  # x-coordinate of the front tip (rootx)
+        (-100, 100),  # z-coordinate of the front tip (rootz)
+        (-3.14, 3.14),  # angle of the front tip (rooty)
+        (-3.14, 3.14),  # angle of the back thigh (bthigh)
+        (-3.14, 3.14),  # angle of the back shin (bshin)
+        (-3.14, 3.14),  # angle of the back foot (bfoot)
+        (-3.14, 3.14),  # angle of the front thigh (fthigh)
+        (-3.14, 3.14),  # angle of the front shin (fshin)
+        (-3.14, 3.14),  # angle of the front foot (ffoot)
+        
+        # Velocity dimensions
+        (-10, 10),  # velocity of the x-coordinate of front tip
+        (-10, 10),  # velocity of the z-coordinate of front tip
+        (-10, 10),  # angular velocity of the front tip
+        (-10, 10),  # angular velocity of the back thigh
+        (-10, 10),  # angular velocity of the back shin
+        (-10, 10),  # angular velocity of the back foot
+        (-10, 10),  # angular velocity of the front thigh
+        (-10, 10),  # angular velocity of the front shin
+        (-10, 10),  # angular velocity of the front foot
+    ]
+    
+    # Define action space (6 dimensions for controlling joints)
+    act_space: Space = [
+        (-1, 1),  # Torque applied on the back thigh rotor
+        (-1, 1),  # Torque applied on the back shin rotor
+        (-1, 1),  # Torque applied on the back foot rotor
+        (-1, 1),  # Torque applied on the front thigh rotor
+        (-1, 1),  # Torque applied on the front shin rotor
+        (-1, 1),  # Torque applied on the front foot rotor
+    ]
+
+    env.get_body_com("torso") | Torso center of mass [x,y,z] | (-∞, ∞) |
+    env.data.qpos | Full position state
+    env.data.qvel | Full velocity state
+
+The state is always a numpy array.
+Although the state is described as a tensor, you can always treat it as a numpy ndarray for all computations.
+
+You may use all the modules in the given example of the expert reward function.
+You should return the reward function in a similar format to the expert reward function.
+For each reward function you return, name it as "RewardFunc_<number>" where <number> starts from 1 and do not use markdown formatting. 
+Reward functions should be separated by a line of "--------------------------------".
+Important: Each reward function should be independent, so make sure to re-import all the modules you need in every reward function.
+Generate 16 reward functions that would perform better than the expert reward function.
+
+Add these methods to the reward function as well:
+    @property
+    def weights(self) -> np.ndarray:          # ← 1‑D vector
+        ...
+
+    def set_weights(self, w: np.ndarray):     # ← same length, in‑place
+        ...
+
+    def get_features(self) -> Dict[str, str]:
+        # a dictionary of feature names and their formulas used to compute the reward
+        # features should be pythonic expressions 
+        #example:
+        # return
+        # {
+        #     "var_name": "np.sum(np.square(action))",
+        #     "var_name2": "np.sum(action)",
+        #     "var_name3": "abs(state[x])",
+        # }
+        # a feature is a variable that is used to compute the reward
+        # it should be in the order corresponding to their weights
+        ...

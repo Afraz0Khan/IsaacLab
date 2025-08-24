@@ -1,0 +1,125 @@
+Task: Generate {K} Python reward classes for Humanoid.
+
+Environment facts (concise):
+- Observation: high-dimensional (angles, velocities, orientation).
+- Action: ~17 floats (torques).
+- x_velocity may be provided (float); handle None gracefully.
+
+Hard output rules (strict):
+1) Output ONLY code. No prose, no markdown fences.
+2) Separate each class with a line of exactly:
+--------------------------------
+3) Each block must start with the class declaration on the first non-empty line:
+   class RewardFunc_{i}(RewardFunc):
+   where i runs consecutively.
+4) Each class must implement:
+   def __call__(self, state, action, next_state, x_velocity=None) -> float:
+   - Return a Python float (wrap numpy scalars with float(...)).
+   - Use only numpy as np. No other imports.
+   - Deterministic; no randomness or I/O.
+   - Never index past available dims. If you slice, guard lengths.
+   - If x_velocity is None, compute forward velocity proxy or set safe default (0.0).
+5) Keep each class concise (≤ 45 lines). Clear variable names.
+
+Design guidance (diversity):
+- Mix forward velocity, heading alignment, posture/balance, foot placement, energy/jerk penalties, smoothness, recovery terms.
+- Ensure numerical stability (clip, eps where needed).
+
+Generate exactly {K} classes numbered from RewardFunc_{start} to RewardFunc_{end}.
+You are a reinforcement learning and reward shaping expert. You are given the Gymnasium environment Humanoid and its expert reward function.
+
+You are part of an iterative process to generate a set of reward functions that can possibly perform faster and better than the expert reward function.
+
+Every iteration from now, you will be given a matrix of STARC (Standardized Reward Comparison) distances between the reward functions you have generated so far.
+That matrix will also include the STARC distance between the candidate reward function, the expert reward function, and the negative of the expert reward function.
+
+Background – STARC distance (Standardized Reward Comparison)
+• STARC compares two reward functions after removing harmless transformations (positive scaling and potential shaping) and after rescaling them to the same length.
+• Internally it:
+   1. uses a quick value‑function estimate to strip shaping,
+   2. normalizes each reward,
+   3. evaluates both on a fixed batch of 96 sampled transitions,
+   4. returns the Euclidean distance between those 96‑D vectors.
+• The score lies in [0, ∞). 0 = identical incentives (would yield the same optimal policy). Larger numbers mean genuinely different behavioural (policy) incentives.
+
+All your rewards should accomplish the same goal, but you are allowed to use different logics to achieve it.
+The goal is to balance the difference in logic and how better the reward may perform.
+You will be called for 3 iterations. After evaluating the STARC matrix, decide whether you want to explore with more features or improve the existing features.
+The reward should be presented as the sum of the features you use. The features should be positive but their weights can be negative.
+
+The following is the expert reward function:
+```python
+from typing import Optional
+import numpy as np
+import torch
+from starc.core.reward_func import RewardFunc
+
+class ExpertReward(RewardFunc):
+    """
+        A standard Humanoid locomotion reward: forward progress minus control cost and fall penalty.
+    """
+    def __call__(self,
+                 env,  # Gym Humanoid env (unused in formula)
+                 state: Optional[torch.Tensor],
+                 action,
+                 next_state,
+                 x_velocity: float = None) -> float:
+        # Proxy Humanoid reward:
+        # reward = forward_reward - ctrl_cost - fall_term
+        forward_reward = 1.0 * (x_velocity or 0.0)
+        ctrl_cost = 0.001 * np.sum(np.square(action))
+        # approximate fall as invalid next_state
+        fall_term = 0.0
+        try:
+            ns = np.asarray(next_state, dtype=np.float32).reshape(-1)
+            if not np.all(np.isfinite(ns)):
+                fall_term = 2.0
+        except Exception:
+            pass
+        reward = forward_reward - ctrl_cost - fall_term
+
+        if hasattr(reward, 'item'): return reward.item()
+        return reward
+```
+
+Environment summary:
+- State: high-dimensional numpy array (joint angles, velocities, orientation)
+- Action: ~17‑D continuous torques in [-1, 1] (typical)
+- Goal: make forward progress while maintaining balance, minimizing energy, and avoiding falls
+
+The state is always a numpy array. Although the state can be described as a tensor, you can always treat it as a numpy ndarray for all computations.
+
+You may use all the modules in the given example of the expert reward function.
+You should return the reward function in a similar format to the expert reward function.
+For each reward function you return, name it as "RewardFunc_<number>" where <number> starts from 1 and do not use markdown formatting.
+Reward functions should be separated by a line of "--------------------------------".
+Important: Each reward function should be independent, so make sure to re‑import all the modules you need in every reward function.
+Generate 16 reward functions that would perform better than the expert reward function.
+
+Add these methods to the reward function as well:
+    @property
+    def weights(self) -> np.ndarray:          # ← 1‑D vector
+        ...
+
+    def set_weights(self, w: np.ndarray):     # ← same length, in‑place
+        ...
+
+    def get_features(self) -> Dict[str, str]:
+        # a dictionary of feature names and their formulas used to compute the reward
+        # example:
+        # return {
+        #     "var_name": "np.sum(np.square(action))",
+        #     "var_name2": "np.sum(action)",
+        #     "var_name3": "abs(state[0])",
+        # }
+        # a feature is a variable that is used to compute the reward
+        # it should be in the order corresponding to their weights
+        ...
+
+Guidance for Humanoid locomotion diversity:
+- Forward velocity and heading alignment
+- Balance, posture, and foot placement (e.g., COM over support)
+- Energy/jerk penalties and smoothness
+- Recovery/fall avoidance and foot clearance heuristics
+- Multi‑objective combinations and novel approaches
+

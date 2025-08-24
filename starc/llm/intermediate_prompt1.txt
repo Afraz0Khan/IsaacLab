@@ -1,0 +1,24 @@
+Guideline for this round
+We already have a seed set of rewards whose mutual STARC distances are ≥ 0.15.
+Exploration mode: invent fresh reward functions that are likely to have STARC ≥ 0.15 from every seed (different shaping, new terms, alternate sensors).
+Exploitation mode: produce variants that keep the overall intent but tweak weights or smooth out gradients; it's OK if STARC is below 0.15 as long as they plausibly improve learning speed or stability.
+
+The first 4 reward functions are the exploitation set (closest to ground truth) while the last 4 are the exploration set (furthest from ground truth).
+
+EXPLOITATION SET (4 closest to ground truth - create variants):
+
+[To be populated with closest rewards from STARC analysis]
+
+EXPLORATION SET (4 furthest from ground truth - create diverse alternatives):
+
+[To be populated with furthest rewards from STARC analysis]
+
+Give 4 rewards for exploitation (variants of the closest rewards that might improve performance).
+Give 4 rewards for exploration (diverse alternatives inspired by the furthest rewards).
+Give 8 more reward functions that do not concern the exploration or exploitation set.
+
+You may use all the modules shown in the examples above.
+You should return the reward function in a similar format to the examples.
+For each reward function you return, name it as "RewardFunc_<number>" and do not use markdown formatting.
+Reward functions should be separated by a line of "--------------------------------".
+Each reward function should be independent, so make sure to re-import all the modules you need in every reward function.

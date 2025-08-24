@@ -1,0 +1,8 @@
+numpy
+einops
+torch
+gym
+gym[mujoco]
+joblib
+stable_baselines3
+scikit-learn
