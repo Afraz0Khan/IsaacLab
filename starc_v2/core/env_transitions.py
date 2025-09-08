@@ -2,12 +2,12 @@ import numpy as np
 from typing import Tuple
 
 
-def build_transition_batch(env_name: str, n_samples: int = 96, seed: int = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def build_transition_batch(env_name: str, n_samples: int = 96, seed: int = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Build a transition batch (S, A, SP, X_VEL) for the requested env using Gymnasium Mujoco tasks.
+    Build a transition batch (S, A, SP, X_VEL, CF) for the requested env using Gymnasium Mujoco tasks.
 
     - env_name: 'halfcheetah' | 'ant' | 'humanoid'
-    - returns: S (Nxd), A (Nxu), SP (Nxd), X_VEL (Nx)
+    - returns: S (Nxd), A (Nxu), SP (Nxd), X_VEL (Nx), CF (Nxf) where f is contact force dimensions
     """
     try:
         import gymnasium as gym
@@ -29,7 +29,7 @@ def build_transition_batch(env_name: str, n_samples: int = 96, seed: int = 0) ->
     rng = np.random.default_rng(seed)
     dt = getattr(getattr(env, 'unwrapped', env), 'dt', 0.02)
 
-    S_list, A_list, SP_list, XV_list = [], [], [], []
+    S_list, A_list, SP_list, XV_list, CF_list = [], [], [], [], []
 
     # Try to read root x from mujoco data when available
     def get_root_x(_env):
@@ -37,6 +37,19 @@ def build_transition_batch(env_name: str, n_samples: int = 96, seed: int = 0) ->
             return float(_env.unwrapped.data.qpos[0])
         except Exception:
             return None
+    
+    # Try to read contact forces from mujoco data when available
+    def get_contact_forces(_env):
+        try:
+            return np.asarray(_env.unwrapped.data.cfrc_ext, dtype=np.float32).copy().reshape(-1)
+        except Exception:
+            # Return appropriate-sized zero array based on environment
+            if env_name == 'ant':
+                return np.zeros(24, dtype=np.float32)  # 4 feet x 6 DOF
+            elif env_name == 'humanoid':
+                return np.zeros(12, dtype=np.float32)  # 2 feet x 6 DOF
+            else:
+                return np.zeros(6, dtype=np.float32)   # Default for halfcheetah
 
     # Sample random transitions
     obs, _ = env.reset()
@@ -65,11 +78,15 @@ def build_transition_batch(env_name: str, n_samples: int = 96, seed: int = 0) ->
         else:
             # Fallback: 0 if root position unavailable
             x_vel = 0.0
+        
+        # contact forces
+        cf = get_contact_forces(env)
 
         S_list.append(np.asarray(obs, dtype=np.float32).reshape(-1))
         A_list.append(act.reshape(-1))
         SP_list.append(np.asarray(next_obs, dtype=np.float32).reshape(-1))
         XV_list.append(float(x_vel))
+        CF_list.append(cf)
 
         obs = next_obs
         if done:
@@ -82,5 +99,6 @@ def build_transition_batch(env_name: str, n_samples: int = 96, seed: int = 0) ->
         np.vstack(A_list),
         np.vstack(SP_list),
         np.asarray(XV_list, dtype=np.float32),
+        np.vstack(CF_list),
     )
 

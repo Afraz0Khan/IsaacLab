@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, cast
 import numpy as np
 import torch
 import sys
@@ -10,12 +10,18 @@ from starc.core.reward_func import RewardFunc  # type: ignore
 
 
 class GroundTruthHumanoidReward(RewardFunc):
-    """
-    Simplified proxy ground-truth for Humanoid locomotion used as STARC reference:
-    reward = forward_velocity - 0.001 * sum(|action|) - 2.0 * fall_penalty
+    """Gymnasium-style Humanoid reward proxy for STARC analysis.
 
-    fall_penalty is approximated as a large penalty if next_state has NaNs or
-    if vertical body component appears invalid. This remains environment-agnostic.
+    reward = healthy_reward + forward_reward - ctrl_cost - contact_cost
+
+    Defaults (Gymnasium Humanoid):
+    - healthy_reward = 5.0 per step
+    - forward_reward_weight = 1.25
+    - ctrl_cost_weight = 0.1
+    - contact_cost_weight = 5e-7
+
+    Contact forces are not present in STARC transitions, so contact_cost=0 unless
+    caller provides next_state["contact_forces"].
     """
 
     def __call__(self,
@@ -23,22 +29,18 @@ class GroundTruthHumanoidReward(RewardFunc):
                  state: Optional[torch.Tensor],
                  action,
                  next_state,
-                 x_velocity: float = None) -> float:
-        if x_velocity is None:
-            x_velocity = 0.0
-        try:
-            act = np.asarray(action, dtype=np.float32).reshape(-1)
-            energy_penalty = 0.001 * float(np.sum(np.abs(act)))
-        except Exception:
-            energy_penalty = 0.0
-        fall_term = 0.0
-        try:
-            ns = np.asarray(next_state, dtype=np.float32).reshape(-1)
-            if not np.all(np.isfinite(ns)):
-                fall_term = 1.0
-        except Exception:
-            pass
-        return float(x_velocity) - energy_penalty - 2.0 * fall_term
+                 x_velocity: Optional[float] = None,
+                 contact_forces: Optional[torch.Tensor] = None) -> float:
+        # Simplified Gymnasium Humanoid reward
+        healthy_reward = 5.0
+        vx = cast(float, x_velocity)
+        forward_reward = 1.25 * vx
+        ctrl_cost = 0.1 * float(np.sum(np.square(action)))
+        contact_cost = 0.0
+        if contact_forces is not None:
+            f = np.asarray(contact_forces, dtype=np.float32).ravel()
+            contact_cost = 5e-7 * float(np.sum(f * f))
+        return float(healthy_reward + forward_reward - ctrl_cost - contact_cost)
 
 
 class NegativeGroundHumanoidReward(RewardFunc):
@@ -52,6 +54,7 @@ class NegativeGroundHumanoidReward(RewardFunc):
                  state: Optional[torch.Tensor],
                  action,
                  next_state,
-                 x_velocity: float = None) -> float:
-        return -self.gt(env, state, action, next_state, x_velocity)
+                 x_velocity: Optional[float] = None,
+                 contact_forces: Optional[torch.Tensor] = None) -> float:
+        return -self.gt(env, state, action, next_state, x_velocity, contact_forces)
 

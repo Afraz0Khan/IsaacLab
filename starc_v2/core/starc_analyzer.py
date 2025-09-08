@@ -13,7 +13,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'starc'))
 
 from starc.rewards.ground_truth_reward import GroundTruthReward
 from ..rewards.negative_ground_reward_fixed import NegativeGroundRewardFixed as NegativeGroundReward
-from .half_cheetah_env_fixed import HalfCheetahEnvFixed as HalfCheetahEnv
+from .half_cheetah_env_fixed import HalfCheetahEnvFixed
+from .ant_env_fixed import AntEnvFixed
+from .humanoid_env_fixed import HumanoidEnvFixed
 from ..rewards.ground_truth_ant import GroundTruthAntReward, NegativeGroundAntReward
 from ..rewards.ground_truth_humanoid import GroundTruthHumanoidReward, NegativeGroundHumanoidReward
 
@@ -34,7 +36,7 @@ class STARCv2Analyzer:
         self.n_episodes_sarsa = STARCv2Config.N_EPISODES_SARSA
         self.n_samples = STARCv2Config.N_SAMPLES
         
-    def analyze_rewards(self, reward_files: List[pathlib.Path], iteration: int, precomputed_batch: Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = None, include_references: bool = True) -> Dict:
+    def analyze_rewards(self, reward_files: List[pathlib.Path], iteration: int, precomputed_batch: Optional[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = None, include_references: bool = True) -> Dict:
         """
         Analyze reward functions using STARC distance. Optionally include reference rewards.
         
@@ -52,17 +54,34 @@ class STARCv2Analyzer:
         if precomputed_batch is None:
             print("  [STARc] No precomputed batch passed; creating dummy env and sampling transitions…")
             print("  [STARC] Building dummy environment (no SARSA)…")
-            dummy_env = HalfCheetahEnv(GroundTruthReward(), self.discount, 0)
-            S, A, SP, X_VEL = self._build_transition_batch(dummy_env)
+            
+            # Choose environment wrapper based on configuration
+            from ..config import STARCv2Config
+            env_name = STARCv2Config.ENV_NAME
+            
+            if env_name == 'ant':
+                dummy_env = AntEnvFixed(GroundTruthAntReward(), self.discount, 0)
+            elif env_name == 'humanoid':
+                dummy_env = HumanoidEnvFixed(GroundTruthHumanoidReward(), self.discount, 0)
+            else:
+                # Default to HalfCheetah
+                dummy_env = HalfCheetahEnvFixed(GroundTruthReward(), self.discount, 0)
+            
+            S, A, SP, X_VEL, CF = self._build_transition_batch(dummy_env)
         else:
             print("  [STARC] Using precomputed transition batch.")
-            S, A, SP, X_VEL = precomputed_batch
+            # Accept legacy 4‑tuple (S, A, SP, X_VEL) or new 5‑tuple (… , CF)
+            if isinstance(precomputed_batch, tuple) and len(precomputed_batch) == 5:
+                S, A, SP, X_VEL, CF = precomputed_batch  # type: ignore[misc]
+            else:
+                S, A, SP, X_VEL = precomputed_batch  # type: ignore[misc]
+                CF = np.zeros((len(S), 1), dtype=np.float32)
         
         # Process reward functions
         if include_references:
-            vectors, names, reference_indices = self._process_rewards_with_references(reward_files, S, A, SP, X_VEL)
+            vectors, names, reference_indices = self._process_rewards_with_references(reward_files, S, A, SP, X_VEL, CF)
         else:
-            vectors, names = self._process_rewards_only(reward_files, S, A, SP, X_VEL)
+            vectors, names = self._process_rewards_only(reward_files, S, A, SP, X_VEL, CF)
             reference_indices = None
         
         # Calculate distance matrix among processed rewards
@@ -72,7 +91,7 @@ class STARCv2Analyzer:
             "reward_names": names,
             "vectors": vectors,
             "distance_matrix": distance_matrix,
-            "transition_data": {"S": S, "A": A, "SP": SP, "X_VEL": X_VEL},
+            "transition_data": {"S": S, "A": A, "SP": SP, "X_VEL": X_VEL, "CF": CF},
             "iteration": iteration,
         }
         if include_references and reference_indices is not None:
@@ -193,22 +212,15 @@ class STARCv2Analyzer:
         return "\n".join(lines)
     
     def _format_full_matrix(self, results: Dict) -> str:
-        """Original full matrix format (kept for compatibility)"""
-        return self._build_matrix_string(
-            results['reward_names'], 
-            results['distance_matrix'],
-            results['ground_truth_distances'],
-            results['negative_ground_distances'],
-            results['reference_indices'],
-            list(range(len(results['reward_names'])))
-        )
+        """Fallback to compact matrix for simplicity (kept for compatibility)."""
+        return self._format_compact_matrix(results)
     
-    def _build_transition_batch(self, env, n=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _build_transition_batch(self, env, n=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Build a batch of transitions for STARC analysis, including x_velocity."""
         if n is None:
             n = self.n_samples
         
-        s_list, a_list, sp_list, xvel_list = [], [], [], []
+        s_list, a_list, sp_list, xvel_list, cf_list = [], [], [], [], []
         # Handle variable return values from reset()
         reset_result = env.reset()
         if isinstance(reset_result, tuple):
@@ -242,11 +254,20 @@ class STARCv2Analyzer:
                 x_position_after = 0.0
             x_velocity = (x_position_after - x_position_before) / env.dt if hasattr(env, 'dt') else 0.0
             sp = obs.copy()
+            # contact forces if available (Gym: data.cfrc_ext in MuJoCo)
+            try:
+                if hasattr(env, 'data') and hasattr(env.data, 'cfrc_ext'):
+                    cf = np.asarray(env.data.cfrc_ext, dtype=np.float32).copy().reshape(-1)
+                else:
+                    cf = np.zeros(1, dtype=np.float32)
+            except Exception:
+                cf = np.zeros(1, dtype=np.float32)
             
             s_list.append(s)
             a_list.append(a)
             sp_list.append(sp)
             xvel_list.append(x_velocity)
+            cf_list.append(cf)
             
             # Reset periodically to avoid getting stuck
             if i % 100 == 0:
@@ -260,9 +281,9 @@ class STARCv2Analyzer:
                 else:
                     prev_x_position = 0.0
         
-        return np.vstack(s_list), np.vstack(a_list), np.vstack(sp_list), np.array(xvel_list)
+        return np.vstack(s_list), np.vstack(a_list), np.vstack(sp_list), np.array(xvel_list), np.vstack(cf_list)
     
-    def _process_rewards_with_references(self, reward_files: List[pathlib.Path], S: np.ndarray, A: np.ndarray, SP: np.ndarray, X_VEL: np.ndarray) -> Tuple[List[np.ndarray], List[str], Dict]:
+    def _process_rewards_with_references(self, reward_files: List[pathlib.Path], S: np.ndarray, A: np.ndarray, SP: np.ndarray, X_VEL: np.ndarray, CF: np.ndarray) -> Tuple[List[np.ndarray], List[str], Dict]:
         """Process reward functions including reference rewards (GT and -GT)"""
         vectors = []
         names = []
@@ -314,7 +335,8 @@ class STARCv2Analyzer:
                         float(self.discount),
                         int(STARCv2Config.N_EPISODES_SARSA),
                         device_list[idx % len(device_list)],
-                        S, A, SP, X_VEL,
+                        S, A, SP, X_VEL, CF,
+                        STARCv2Config.ENV_NAME,  # Pass env_name to worker
                     )
                 )
 
@@ -350,7 +372,7 @@ class STARCv2Analyzer:
             else:
                 device_single = "cuda:0" if torch.cuda.is_available() else "cpu"
             for item in ["__REF__:GT", "__REF__:NEG"] + [str(p) for p in reward_files]:
-                name, vec, err = _process_reward_worker((item, float(self.discount), int(STARCv2Config.N_EPISODES_SARSA), device_single, S, A, SP, X_VEL))
+                name, vec, err = _process_reward_worker((item, float(self.discount), int(STARCv2Config.N_EPISODES_SARSA), device_single, S, A, SP, X_VEL, CF, STARCv2Config.ENV_NAME))
                 if err is None:
                     vectors.append(vec)
                     names.append(name)
@@ -372,7 +394,7 @@ class STARCv2Analyzer:
         print(f"  ✅ Successfully processed {len(vectors)-2}/{len(reward_files)} generated rewards + 2 references")
         return vectors, names, reference_indices
 
-    def _process_rewards_only(self, reward_files: List[pathlib.Path], S: np.ndarray, A: np.ndarray, SP: np.ndarray, X_VEL: np.ndarray) -> Tuple[List[np.ndarray], List[str]]:
+    def _process_rewards_only(self, reward_files: List[pathlib.Path], S: np.ndarray, A: np.ndarray, SP: np.ndarray, X_VEL: np.ndarray, CF: np.ndarray) -> Tuple[List[np.ndarray], List[str]]:
         """Process only the provided reward functions (no references)."""
         vectors: List[np.ndarray] = []
         names: List[str] = []
@@ -403,7 +425,7 @@ class STARCv2Analyzer:
 
             worker_args = []
             for idx, item in enumerate([str(p) for p in reward_files]):
-                worker_args.append((item, float(self.discount), int(STARCv2Config.N_EPISODES_SARSA), device_list[idx % len(device_list)], S, A, SP, X_VEL))
+                worker_args.append((item, float(self.discount), int(STARCv2Config.N_EPISODES_SARSA), device_list[idx % len(device_list)], S, A, SP, X_VEL, CF, STARCv2Config.ENV_NAME))
 
             with ctx.Pool(processes=n_workers) as pool:
                 total = len(worker_args)
@@ -427,7 +449,7 @@ class STARCv2Analyzer:
             else:
                 device_single = "cuda:0" if torch.cuda.is_available() else "cpu"
             for item in [str(p) for p in reward_files]:
-                name, vec, err = _process_reward_worker((item, float(self.discount), int(STARCv2Config.N_EPISODES_SARSA), device_single, S, A, SP, X_VEL))
+                name, vec, err = _process_reward_worker((item, float(self.discount), int(STARCv2Config.N_EPISODES_SARSA), device_single, S, A, SP, X_VEL, CF, STARCv2Config.ENV_NAME))
                 if err is None:
                     vectors.append(vec)
                     names.append(name)
@@ -474,23 +496,30 @@ class STARCv2Analyzer:
                 return getattr(module, name)()
         raise ImportError(f"Could not find a valid RewardFunc class in {path}")
 
-    def _compute_reward_vector(self, env, S: np.ndarray, A: np.ndarray, SP: np.ndarray, X_VEL: np.ndarray) -> np.ndarray:
+    def _compute_reward_vector(self, env, S: np.ndarray, A: np.ndarray, SP: np.ndarray, X_VEL: np.ndarray, CF: np.ndarray) -> np.ndarray:
         """Compute canonicalized and normalized reward vector using StateVals when available.
 
         Canonical form (VAL-2): r_canon = r(s,a,s') - V(s) + discount * V(s')
         """
         import inspect
-        # Determine if reward expects x_velocity
-        if hasattr(env.reward_func, '__call__'):
-            sig = inspect.signature(env.reward_func.__call__)
-        else:
-            sig = inspect.signature(env.reward_func)
+        # Determine if reward expects x_velocity by inspecting the curried function
+        # The curried function has 'env' already bound, so we inspect its signature
+        try:
+            sig = inspect.signature(env.reward_func_curried)
+        except (ValueError, TypeError):
+            # Fallback to original function if curried signature fails
+            if hasattr(env.reward_func, '__call__'):
+                sig = inspect.signature(env.reward_func.__call__)
+            else:
+                sig = inspect.signature(env.reward_func)
+        
         param_names = list(sig.parameters.keys())
         expects_xvel = 'x_velocity' in param_names
+        accepts_cf = 'contact_forces' in param_names or 'next_state' in param_names
 
         # Vectorized raw reward over fixed transitions
-        raw_f = self._canon_callable(env.reward_func_curried, expects_xvel)
-        r_vec = raw_f(S, A, SP, X_VEL) if expects_xvel else raw_f(S, A, SP)
+        raw_f = self._canon_callable(env.reward_func_curried, expects_xvel, accepts_cf)
+        r_vec = raw_f(S, A, SP, X_VEL, CF) if expects_xvel else raw_f(S, A, SP, None, CF)
         if r_vec is None:
             raise ValueError("Canon function returned None")
         r_vec = r_vec.astype(np.float32)
@@ -522,9 +551,9 @@ class STARCv2Analyzer:
             canon_vec = canon_vec / norm
         return canon_vec.astype(np.float32)
 
-    def _canon_callable(self, reward_callable, expects_xvel=False):
+    def _canon_callable(self, reward_callable, expects_xvel=False, accepts_cf=False):
         """Create a canonical callable for the reward function, supporting x_velocity if needed."""
-        def vectorized_reward(S, A, SP, X_VEL=None):
+        def vectorized_reward(S, A, SP, X_VEL=None, CF=None):
             results = []
             for i in range(len(S)):
                 try:
@@ -537,10 +566,21 @@ class STARCv2Analyzer:
                     if isinstance(sp_i, np.ndarray) and sp_i.shape[0] == 17:
                         sp_i = np.pad(sp_i, (0, 1), mode='constant')
 
-                    if expects_xvel:
-                        r = reward_callable(s_i, A[i], sp_i, X_VEL[i])
+                    # Always provide a dict next_state to maximize compatibility
+                    cf_i = None if CF is None else CF[i]
+                    next_state_payload = {"raw": sp_i, "contact_forces": cf_i}
+
+                    vx_i = 0.0 if X_VEL is None else X_VEL[i]
+                    if expects_xvel and accepts_cf:
+                        # (state, action, next_state, x_velocity, contact_forces)
+                        r = reward_callable(s_i, A[i], next_state_payload, vx_i, cf_i)
+                    elif expects_xvel:
+                        r = reward_callable(s_i, A[i], next_state_payload, vx_i)
+                    elif accepts_cf:
+                        # Support rewards that accept contact_forces without x_velocity
+                        r = reward_callable(s_i, A[i], next_state_payload, cf_i)
                     else:
-                        r = reward_callable(s_i, A[i], sp_i)
+                        r = reward_callable(s_i, A[i], next_state_payload)
                     if r is None:
                         raise ValueError(f"Reward function returned None for transition {i}")
                     results.append(r)
@@ -566,9 +606,11 @@ class STARCv2Analyzer:
 # Module-level worker to be picklable by multiprocessing
 def _process_reward_worker(args):
     import pathlib
-    from .half_cheetah_env_fixed import HalfCheetahEnvFixed as HalfCheetahEnv
+    from .half_cheetah_env_fixed import HalfCheetahEnvFixed
+    from .ant_env_fixed import AntEnvFixed
+    from .humanoid_env_fixed import HumanoidEnvFixed
     try:
-        (path_str, discount, n_episodes_sarsa, device_str, S, A, SP, X_VEL) = args
+        (path_str, discount, n_episodes_sarsa, device_str, S, A, SP, X_VEL, CF, env_name) = args
         path = pathlib.Path(path_str) if not str(path_str).startswith("__REF__:") else None
         # Set device override for SARSA/StateVals in this worker
         if device_str:
@@ -590,8 +632,6 @@ def _process_reward_worker(args):
         # Handle reference rewards
         if path is None:
             tag = str(path_str)
-            from ..config import STARCv2Config
-            env_name = STARCv2Config.ENV_NAME
             if tag == "__REF__:GT":
                 if env_name == 'ant':
                     reward_obj = GroundTruthAntReward()
@@ -611,8 +651,18 @@ def _process_reward_worker(args):
         else:
             reward_obj = analyzer._load_reward_from_file(path)
             name = path.stem
-        env = HalfCheetahEnv(reward_obj, discount, n_episodes_sarsa)
-        vector = analyzer._compute_reward_vector(env, S, A, SP, X_VEL)
+        
+        # Use environment name passed from main process (not config)
+        
+        if env_name == 'ant':
+            env = AntEnvFixed(reward_obj, discount, n_episodes_sarsa)
+        elif env_name == 'humanoid':
+            env = HumanoidEnvFixed(reward_obj, discount, n_episodes_sarsa)
+        else:
+            # Default to HalfCheetah
+            env = HalfCheetahEnvFixed(reward_obj, discount, n_episodes_sarsa)
+        
+        vector = analyzer._compute_reward_vector(env, S, A, SP, X_VEL, CF)
         return (name, vector, None)
     except Exception as e:
         import traceback

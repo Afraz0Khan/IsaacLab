@@ -38,7 +38,7 @@ class STARCv2Config:
     DISCOUNT = 0.848
     
     # Number of transition samples for STARC analysis
-    N_SAMPLES = 256
+    N_SAMPLES = 1024
 
     # Parallelism for reward processing (None or 0 → sequential)
     N_WORKERS = 8  # e.g., 4 to process rewards in parallel during analysis

@@ -24,15 +24,18 @@ class GroundTruthAntReward(RewardFunc):
                  state: Optional[torch.Tensor],
                  action,
                  next_state,
-                 x_velocity: float = None) -> float:
-        if x_velocity is None:
-            x_velocity = 0.0
-        try:
-            act = np.asarray(action, dtype=np.float32).reshape(-1)
-            energy_penalty = 0.001 * float(np.sum(np.abs(act)))
-        except Exception:
-            energy_penalty = 0.0
-        return float(x_velocity) - energy_penalty
+                 x_velocity: Optional[float] = None,
+                 contact_forces: Optional[torch.Tensor] = None) -> float:
+        # Simplified Gymnasium Ant reward
+        healthy_reward = 1.0
+        vx = 0.0 if x_velocity is None else float(x_velocity)
+        forward_reward = 1.0 * vx
+        ctrl_cost = 0.5 * float(np.sum(np.square(action)))
+        contact_cost = 0.0
+        if contact_forces is not None:
+            f = np.asarray(contact_forces, dtype=np.float32).ravel()
+            contact_cost = 5e-4 * float(np.sum(f * f))
+        return float(healthy_reward + forward_reward - ctrl_cost - contact_cost)
 
 
 class NegativeGroundAntReward(RewardFunc):
@@ -46,6 +49,7 @@ class NegativeGroundAntReward(RewardFunc):
                  state: Optional[torch.Tensor],
                  action,
                  next_state,
-                 x_velocity: float = None) -> float:
-        return -self.gt(env, state, action, next_state, x_velocity)
+                 x_velocity: Optional[float] = None,
+                 contact_forces: Optional[torch.Tensor] = None) -> float:
+        return -self.gt(env, state, action, next_state, x_velocity, contact_forces)
 

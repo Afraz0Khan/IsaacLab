@@ -34,9 +34,13 @@ import numpy as np
 
 
 def find_latest_iteration(results_dir: Path) -> Path:
+    def extract_iter_num(p: Path) -> int:
+        match = re.search(r"iteration_(\d+)", p.name)
+        return int(match.group(1)) if match else 0
+    
     iters = sorted(
         (p for p in results_dir.glob("iteration_*") if p.is_dir()),
-        key=lambda p: int(re.search(r"iteration_(\d+)", p.name).group(1)),
+        key=extract_iter_num,
     )
     if not iters:
         raise RuntimeError(f"No iteration_* folders under {results_dir}")
@@ -68,13 +72,15 @@ def farthest_sampling(items: List[str], idx_lookup: Dict[str, int], D: np.ndarra
 
 
 def resolve_reward_paths(names: List[str], rewards_root: Path) -> List[str]:
+    def extract_iter_from_path(p: Path) -> int:
+        match = re.search(r"iteration_(\d+)", str(p))
+        return int(match.group(1)) if match else -1
+    
     paths: List[str] = []
     for n in names:
         matches = sorted(
             rewards_root.glob(f"**/{n}.py"),
-            key=lambda p: int(re.search(r"iteration_(\d+)", str(p)).group(1))
-            if re.search(r"iteration_(\d+)", str(p))
-            else -1,
+            key=extract_iter_from_path,
         )
         if matches:
             paths.append(str(matches[-1].resolve()))
@@ -96,7 +102,7 @@ def main():
                         help="Path to rewards dir (default: <base>/rewards)")
     parser.add_argument("--clusters", default=None,
                         help="Path to final_clusters.json (default: <results>/final_clusters.json)")
-    parser.add_argument("--target", type=int, default=30,
+    parser.add_argument("--target", type=int, default=20,
                         help="Total number of seeds to select (default: 30)")
     parser.add_argument("--large-threshold", type=int, default=6,
                         help="Cluster size threshold to be considered large (default: 6)")
@@ -107,11 +113,11 @@ def main():
 
     args = parser.parse_args()
 
-    base = Path(args.base)
-    results_dir = Path(args.results) if args.results else (base / "results")
-    rewards_root = Path(args.rewards) if args.rewards else (base / "rewards")
-    clusters_path = Path(args.clusters) if args.clusters else (results_dir / "final_clusters.json")
-    out_dir = Path(args.outdir) if args.outdir else (results_dir / "T1")
+    base = Path(getattr(args, "base"))
+    results_dir = Path(getattr(args, "results")) if getattr(args, "results") else (base / "results")
+    rewards_root = Path(getattr(args, "rewards")) if getattr(args, "rewards") else (base / "rewards")
+    clusters_path = Path(getattr(args, "clusters")) if getattr(args, "clusters") else (results_dir / "final_clusters.json")
+    out_dir = Path(getattr(args, "outdir")) if getattr(args, "outdir") else (results_dir / "T1")
 
     latest = find_latest_iteration(results_dir)
     dm_path = latest / "distance_matrix.npy"

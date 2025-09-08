@@ -199,13 +199,27 @@ class HalfCheetahEnvFixed(OriginalHalfCheetah):
         # Provide a safe default for the first step when self.prev_obs is None
         prev_state = self.prev_obs if self.prev_obs is not None else np.zeros_like(obs)
 
-        # Check if the reward function expects x_velocity
-        if 'x_velocity' in param_names:
-            # New signature: (env, state, action, next_state, x_velocity)
-            return self.reward_func(self, prev_state, action, obs, x_velocity)
+        # Decide whether reward expects explicit env argument
+        expects_env = len(param_names) > 0 and param_names[0] == 'env'
+
+        has_xvel = 'x_velocity' in param_names
+
+        if expects_env:
+            # Signatures with explicit env first
+            if has_xvel:
+                # (env, state, action, next_state, x_velocity)
+                return self.reward_func(self, prev_state, action, obs, x_velocity)
+            else:
+                # (env, prev_obs, action, obs)
+                return self.reward_func(self, prev_state, action, obs)
         else:
-            # Old signature: (env, prev_obs, action, obs)
-            return self.reward_func(self, prev_state, action, obs)
+            # LLM-style signatures without env
+            if has_xvel:
+                # (state, action, next_state, x_velocity)
+                return self.reward_func(prev_state, action, obs, x_velocity)
+            else:
+                # (prev_obs, action, obs)
+                return self.reward_func(prev_state, action, obs)
     
     # ------------------------------------------------------------------
     # Gymnasium-style reset implementation

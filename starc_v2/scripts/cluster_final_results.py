@@ -21,9 +21,13 @@ from starc_v2.pipeline import STARCv2Pipeline
 
 
 def _find_latest_iteration(results_dir: Path) -> Path:
+    def extract_iter_num(p: Path) -> int:
+        match = re.search(r"iteration_(\d+)", p.name)
+        return int(match.group(1)) if match else 0
+    
     iters = sorted(
         (p for p in results_dir.glob("iteration_*") if p.is_dir()),
-        key=lambda p: int(re.search(r"iteration_(\d+)", p.name).group(1)),
+        key=extract_iter_num,
     )
     if not iters:
         raise RuntimeError(f"No iteration_* folders under {results_dir}")
@@ -41,14 +45,19 @@ def main():
     parser.add_argument("--threshold", type=float, default=None,
                         help="Override clustering threshold (else use config)")
     args = parser.parse_args()
+    
+    # Type annotations for clarity
+    env_name = args.env
+    results_path = args.results
+    threshold_override = args.threshold
 
     # Resolve env and paths
-    if args.env:
-        STARCv2Config.ENV_NAME = args.env
+    if env_name:
+        STARCv2Config.ENV_NAME = env_name
     env = STARCv2Config.ENV_NAME
 
     base = Path(__file__).resolve().parents[1]
-    results_base = Path(args.results) if args.results else (base / "results" / env)
+    results_base = Path(results_path) if results_path else (base / "results" / env)
 
     latest = _find_latest_iteration(results_base)
     dm_path = latest / "distance_matrix.npy"
@@ -62,7 +71,7 @@ def main():
         names: List[str] = json.load(f)
 
     # Use the exact clustering helper from the pipeline
-    threshold = args.threshold if args.threshold is not None else STARCv2Config.CLUSTER_THRESHOLD
+    threshold = threshold_override if threshold_override is not None else STARCv2Config.CLUSTER_THRESHOLD
 
     # Ensure numeric stability
     D = np.nan_to_num(D, nan=0.0, posinf=0.0, neginf=0.0)

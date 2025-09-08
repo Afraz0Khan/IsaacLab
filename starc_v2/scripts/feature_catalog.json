@@ -1,182 +1,184 @@
 {
-  "x_velocity": {
-    "expression": "x_velocity",
+  "healthy_const": {
+    "expression": "1.0",
     "used_by": [
-      "RewardFunc_1",
-      "RewardFunc_16",
-      "RewardFunc_4",
+      "RewardFunc_31",
       "RewardFunc_3",
-      "RewardFunc_6"
-    ]
-  },
-  "ctrl_cost": {
-    "expression": "np.sum(np.square(action))",
-    "used_by": [
-      "RewardFunc_1",
-      "RewardFunc_20",
-      "RewardFunc_36",
-      "RewardFunc_18",
-      "RewardFunc_24",
+      "RewardFunc_34",
+      "RewardFunc_27",
+      "RewardFunc_30",
+      "RewardFunc_10",
+      "RewardFunc_19",
       "RewardFunc_35",
-      "RewardFunc_16",
-      "RewardFunc_4",
-      "RewardFunc_3",
       "RewardFunc_6",
+      "RewardFunc_8",
+      "RewardFunc_21",
+      "RewardFunc_43"
+    ]
+  },
+  "forward_vx": {
+    "expression": "vx",
+    "used_by": [
+      "RewardFunc_31",
+      "RewardFunc_3",
+      "RewardFunc_27",
+      "RewardFunc_30",
+      "RewardFunc_10",
+      "RewardFunc_19",
+      "RewardFunc_35",
+      "RewardFunc_6",
+      "RewardFunc_8",
+      "RewardFunc_21",
+      "RewardFunc_43"
+    ]
+  },
+  "exp_neg_ctrl": {
+    "expression": "exp(-0.1*sum(action**2))",
+    "used_by": [
+      "RewardFunc_31"
+    ]
+  },
+  "ctrl_sq": {
+    "expression": "np.sum(action**2)",
+    "used_by": [
+      "RewardFunc_3",
       "RewardFunc_17",
-      "RewardFunc_25",
-      "RewardFunc_40",
-      "RewardFunc_33",
-      "RewardFunc_42",
-      "RewardFunc_43",
+      "RewardFunc_34",
+      "RewardFunc_27",
+      "RewardFunc_30",
+      "RewardFunc_19",
+      "RewardFunc_35",
+      "RewardFunc_29",
+      "RewardFunc_6",
+      "RewardFunc_48",
+      "RewardFunc_8",
+      "RewardFunc_21",
       "RewardFunc_37",
-      "RewardFunc_46"
-    ]
-  },
-  "tanh_v": {
-    "expression": "np.tanh(x_velocity)",
-    "used_by": [
-      "RewardFunc_20"
-    ]
-  },
-  "x_vel_sq": {
-    "expression": "x_velocity**2",
-    "used_by": [
-      "RewardFunc_20"
-    ]
-  },
-  "sqrt_speed": {
-    "expression": "np.sign(x_velocity)*np.sqrt(np.abs(x_velocity))",
-    "used_by": [
-      "RewardFunc_48"
-    ]
-  },
-  "ctrl_cost_sq": {
-    "expression": "(np.sum(np.square(action)))**2",
-    "used_by": [
-      "RewardFunc_48"
-    ]
-  },
-  "x_vel": {
-    "expression": "x_velocity",
-    "used_by": [
-      "RewardFunc_36",
-      "RewardFunc_24",
-      "RewardFunc_17",
-      "RewardFunc_25",
+      "RewardFunc_45",
+      "RewardFunc_46",
       "RewardFunc_40",
-      "RewardFunc_42",
-      "RewardFunc_46"
+      "RewardFunc_43"
     ]
   },
-  "abs_pitch": {
-    "expression": "np.abs(state[2])",
+  "contact_sq": {
+    "expression": "np.sum(contact_forces**2)",
     "used_by": [
-      "RewardFunc_36",
-      "RewardFunc_16"
+      "RewardFunc_3",
+      "RewardFunc_17",
+      "RewardFunc_34",
+      "RewardFunc_19",
+      "RewardFunc_6",
+      "RewardFunc_8"
     ]
   },
-  "speed_pow": {
-    "expression": "np.sign(x_velocity)*np.abs(x_velocity)**1.5",
+  "lateral_abs": {
+    "expression": "abs(qvel_root_y)",
     "used_by": [
-      "RewardFunc_18"
+      "RewardFunc_3"
     ]
   },
-  "forward_lean": {
-    "expression": "-state[2]",
+  "forward_vx_sq": {
+    "expression": "vx**2",
     "used_by": [
-      "RewardFunc_24"
+      "RewardFunc_17"
     ]
   },
-  "speed_torso": {
-    "expression": "x_velocity * env.get_body_com('torso')[2]",
+  "sqrt_vx": {
+    "expression": "sqrt(vx)",
+    "used_by": [
+      "RewardFunc_34"
+    ]
+  },
+  "height_z": {
+    "expression": "state[0]",
+    "used_by": [
+      "RewardFunc_27",
+      "RewardFunc_10"
+    ]
+  },
+  "vert_vel_abs": {
+    "expression": "abs(qvel_root_z)",
+    "used_by": [
+      "RewardFunc_30"
+    ]
+  },
+  "height_dev_sq": {
+    "expression": "(state[0]-1.4)**2",
+    "used_by": [
+      "RewardFunc_19"
+    ]
+  },
+  "height_pen": {
+    "expression": "(1.4-height)^2",
     "used_by": [
       "RewardFunc_35"
     ]
   },
-  "torso_z": {
-    "expression": "env.get_body_com('torso')[2]",
+  "forward_over_qvel": {
+    "expression": "vx / (1 + sum(qvel**2))",
     "used_by": [
-      "RewardFunc_16"
+      "RewardFunc_29"
     ]
   },
-  "joint_vel_sq": {
-    "expression": "np.sum(np.square(state[11:]))",
-    "used_by": [
-      "RewardFunc_16",
-      "RewardFunc_3"
-    ]
-  },
-  "ang_vel_sq": {
-    "expression": "np.sum(np.square(state[11:]))",
-    "used_by": [
-      "RewardFunc_4"
-    ]
-  },
-  "eff_penalty": {
-    "expression": "ctrl_cost/(np.abs(x_velocity)+1e-6)",
+  "height_dev": {
+    "expression": "state[0]-1.4",
     "used_by": [
       "RewardFunc_6"
     ]
   },
-  "efficiency": {
-    "expression": "x_velocity/(ctrl_cost+1e-6)",
+  "vx_times_height": {
+    "expression": "vx*height",
     "used_by": [
-      "RewardFunc_17",
-      "RewardFunc_37"
+      "RewardFunc_48"
     ]
   },
-  "log_speed": {
-    "expression": "np.log1p(np.abs(x_velocity))*np.sign(x_velocity)",
+  "root_rot_vel": {
+    "expression": "||qvel_root_rot||",
     "used_by": [
-      "RewardFunc_34"
-    ]
-  },
-  "l1_torque": {
-    "expression": "np.sum(np.abs(action))",
-    "used_by": [
-      "RewardFunc_34"
-    ]
-  },
-  "abs_front_foot_angle": {
-    "expression": "np.abs(state[8])",
-    "used_by": [
-      "RewardFunc_34"
-    ]
-  },
-  "abs_torso_z_vel": {
-    "expression": "np.abs(state[10])",
-    "used_by": [
-      "RewardFunc_25"
-    ]
-  },
-  "torso_z_vel": {
-    "expression": "np.abs(state[10])",
-    "used_by": [
-      "RewardFunc_40"
-    ]
-  },
-  "exp_speed": {
-    "expression": "np.exp(0.3 * x_velocity)",
-    "used_by": [
-      "RewardFunc_33"
-    ]
-  },
-  "accel_sq": {
-    "expression": "(next_state[9]-state[9])**2",
-    "used_by": [
-      "RewardFunc_42"
-    ]
-  },
-  "speed_mod": {
-    "expression": "x_velocity/(1.0+np.abs(state[8]))",
-    "used_by": [
+      "RewardFunc_8",
       "RewardFunc_43"
     ]
   },
-  "jerk_sq": {
-    "expression": "np.sum(np.square(next_state[11:]-state[11:]))",
+  "exp_contact": {
+    "expression": "exp(contact_sq*1e-6)-1",
+    "used_by": [
+      "RewardFunc_21"
+    ]
+  },
+  "forward_per_abs_action": {
+    "expression": "vx / (0.1 + sum(abs(action)))",
+    "used_by": [
+      "RewardFunc_23"
+    ]
+  },
+  "logistic_vx": {
+    "expression": "1/(1+exp(-vx))",
+    "used_by": [
+      "RewardFunc_37"
+    ]
+  },
+  "constant_shift": {
+    "expression": "-5",
+    "used_by": [
+      "RewardFunc_37"
+    ]
+  },
+  "vx_over_sqrt_energy": {
+    "expression": "vx / sqrt(0.1+sum(action**2))",
+    "used_by": [
+      "RewardFunc_45"
+    ]
+  },
+  "vx_cubed": {
+    "expression": "vx^3",
     "used_by": [
       "RewardFunc_46"
+    ]
+  },
+  "forward_straight": {
+    "expression": "vx*exp(-|y_vel|)",
+    "used_by": [
+      "RewardFunc_40"
     ]
   }
 }
